@@ -1,0 +1,43 @@
+---
+title: "ATP W144 Dataset Cleaning"
+author: "TINA"
+format: html
+---
+
+```{r}
+# Load required libraries
+library(tidyverse)
+library(mccoursepack)
+
+# Load dataset
+data(ATP_W144_excerpt)
+df <- ATP_W144_excerpt
+
+# Columns representing social media use
+social_cols <- c("SMUSE_a_W144", "SMUSE_c_W144", "SMUSE_i_W144", "SMUSE_d_W144")
+
+# Columns representing Facebook reasons
+fb_reason_cols <- c("FBWHY_a_W144","FBWHY_b_W144","FBWHY_c_W144",
+                    "FBWHY_d_W144","FBWHY_e_W144","FBWHY_f_W144","FBWHY_g_W144")
+
+# Create cleaned dataset
+w144_wrangled <- df %>%
+  mutate(
+    # Count number of platforms used
+    platform_count = rowSums(across(all_of(social_cols), ~ if_else(!is.na(.), 1, 0))),
+    # Convert FBWHY columns to 1/0
+    across(all_of(fb_reason_cols), ~ if_else(!is.na(.), 1, 0), .names = "{.col}_n"),
+    # Sum Facebook reasons
+    fb_uses_count = rowSums(across(ends_with("_n")), na.rm = TRUE)
+  )
+
+# Platform count distribution
+table(w144_wrangled$platform_count)
+
+# Facebook reasons summary
+summary(w144_wrangled$fb_uses_count)
+------------------------------
+
+# Save cleaned dataset to 'data/' folder
+if(!dir.exists("data")) dir.create("data")
+write_csv(w144_wrangled, "data/w144_wrangled.csv")
