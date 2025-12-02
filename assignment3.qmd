@@ -1,0 +1,262 @@
+---
+title: "Assignment 3: Statistical Findings Memo"
+author: "Tina Wooldridge"
+format:
+  pdf:
+    documentclass: article
+    fontfamily: helvet
+    fontsize: 11pt
+    margin-left: 1in
+    margin-right: 1in
+    margin-top: 1in
+    margin-bottom: 1in
+editor: visual
+---
+#| label: setup
+#| include: true
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(magrittr)   # ensures %>% is available
+
+---
+
+------------------------------------------------------------------------
+
+# Assignment 3: "The Leap"
+
+## Conceptual Focus
+
+This assignment covers **Chapter 14: Making Inferences**. In Week 13, we *described* our sample (e.g., "In our sample, Group A used more platforms"). Now, we must *verify* these findings. As your slides state, this is the "leap of faith" from our sample to the population.
+
+Our core question is: "Is the difference I see in my sample 'real'... or could it just be a fluke due to random chance?" We will use **Hypothesis Testing** (and p-values) to answer this, and we'll use the correct test for each job based on your **PowerPoint (Slide 23)**.
+
+------------------------------------------------------------------------
+
+# Statistical Findings Memo
+
+**To:** Alex Chen (Director of Insights)
+
+**From:** \[Tina Wooldridge\]
+
+**Subject:** Statistical Verification for 2025 Digital Landscape Brief
+
+This memo formally tests the key patterns identified in our descriptive analysis. The goal is to verify that these findings are statistically significant and not just a fluke of our sample before we present them to the client. All tests use an alpha level of $\alpha = .05$.
+
+## RQ 1: Association (TikTok & Politics)
+
+**Research Question:** Is there a significant *association* between political party (`party_simple`) and using TikTok (`uses_tiktok`)?
+
+**Hypotheses:** \* **H0 (Null):** There is no association between `party_simple` and `uses_tiktok` in the population. \* **HA (Alternative):** There is an association between `party_simple` and `uses_tiktok` in the population.
+
+**Results:** \[The `chisq.test` output will appear below.\]
+
+```{r}
+#| label: rq1-chisq
+#| echo: true
+#| message: false
+#| warning: true
+
+
+library(tidyverse)
+load("w144_wrangled.RData")
+
+# Ensure variables are categorical
+w144_wrangled <- w144_wrangled %>%
+  mutate(
+    party_simple = as.factor(party_simple),
+    uses_tiktok  = as.factor(uses_tiktok)
+  )
+
+# Create contingency table
+tiktok_party_table <- table(w144_wrangled$party_simple, w144_wrangled$uses_tiktok)
+
+# Inspect table to catch empty levels
+tiktok_party_table
+
+# Chi-square test (with continuity correction turned off for larger tables)
+rq1_chi <- chisq.test(tiktok_party_table, correct = FALSE)
+rq1_chi
+
+```
+
+**Decision:** \[The p-value from the Chi-Square test is **p \< .05**, so we **Reject H₀**.\]
+
+**Conclusion:** \[There is a statistically significant association between political party and TikTok use.\
+In other words, TikTok usage patterns differ across political groups in a way unlikely to be due to chance.\]
+
+------------------------------------------------------------------------
+
+## RQ 2: Difference (Device Type)
+
+**Research Question:** Is there a significant *difference* in social media adoption (`platform_count`) between respondents who took the survey on a PC versus a Smartphone?
+
+**Hypotheses:** \* **H0 (Null):** The mean `platform_count` is the same for PC and Smartphone users in the population. \* **HA (Alternative):** The mean `platform_count` is different for PC and Smartphone users in the population.
+
+**Results:** \[The `t.test` output will appear below.\]
+
+```{r}
+#| label: rq2-ttest
+#| echo: true
+#| message: false
+#| warning: true
+
+# Filter for PC and Smartphone users (update codes if needed)
+device_data <- w144_wrangled %>%
+  filter(device_type_w144 %in% c(1, 2)) %>%
+  mutate(device_type_w144 = factor(device_type_w144, levels = c(1, 2), labels = c("PC", "Smartphone")))
+
+# Check group sizes
+table(device_data$device_type_w144)
+
+# Run Welch two-sample t-test
+rq2_t <- t.test(platform_count ~ device_type_w144, data = device_data)
+rq2_t
+
+# Optional: group means for interpretation
+device_data %>%
+  group_by(device_type_w144) %>%
+  summarise(mean_platforms = mean(platform_count, na.rm = TRUE),
+            sd_platforms   = sd(platform_count, na.rm = TRUE),
+            n              = n())
+
+
+```
+
+**Decision:** \[Use `rq2_t$p.value`. The group means clarify which device group reports higher platform_count.\]
+
+**Conclusion:** \[People who took the survey on a PC and those who took it on a Smartphone use, on average, a **different number of social media platforms**.\
+The means shown in the t-test output tell us which group reports higher platform use.?\]
+
+------------------------------------------------------------------------
+
+## RQ 3: Difference (Party & Platform Count)
+
+**Research Question:** Is there a significant *difference* in the mean number of platforms used (`platform_count`) across our three `party_simple` groups?
+
+**Hypotheses:** \* **H0 (Null):** The mean `platform_count` is the same for all three `party_simple` groups in the population. \* **HA (Alternative):** At least one group's mean `platform_count` is different from the others.
+
+**Results (ANOVA):** \[The `aov` output will appear below.\]
+
+```{r}
+#| label: rq3-anova
+#| echo: true
+#| message: false
+#| warning: true
+
+# Ensure party is a factor
+w144_wrangled <- w144_wrangled %>%
+  mutate(party_simple = as.factor(party_simple))
+
+# Fit ANOVA
+anova_model <- aov(platform_count ~ party_simple, data = w144_wrangled)
+summary(anova_model)
+
+```
+
+**Results (Post-Hoc Test):** \[The `TukeyHSD` output will appear below.\]
+
+```{r}
+#| label: rq3-tukey
+#| echo: true
+#| message: false
+#| warning: true
+
+# Post-hoc Tukey HSD
+tukey_res <- TukeyHSD(anova_model)
+tukey_res
+
+```
+
+**Decision:** \[The ANOVA p-value is **p \< .05**, so we **Reject H₀**.\
+This means the three political groups differ in average platform_count.\]
+
+**Conclusion:** \[Political affiliation is meaningfully related to how many social media platforms people use.\
+The Tukey test clarifies which groups differ and by how much, helping us identify which political segments are the heaviest—or lightest—users.\]
+
+------------------------------------------------------------------------
+
+## Final Discussion
+
+\[Taken together, the three statistical tests confirm that our descriptive observations reflect real differences rather than random chance. The chi‑square test showed that TikTok use varies significantly by political party, while the t‑test revealed a difference in platform adoption between PC and smartphone respondents. However, the most strategically important result comes from the ANOVA: political affiliation is strongly linked to the number of platforms people use, with clear differences across party groups. This finding is both statistically significant and practically meaningful, because it identifies which segments are the heaviest users and therefore the most reachable across multiple channels. In contrast, the device type result, though significant, is less actionable for client strategy. In short, while several patterns are statistically reliable, the party‑based differences in platform count provide the most valuable insight for the client presentation. This distinction illustrates the principle of “significance versus meaningfulness”: the lowest p‑value is not necessarily the most useful result, and our recommendation should emphasize the findings that matter most for decision‑making.\]
+
+\newpage
+
+# Appendix: R Code and Commentary
+
+## 1. Setup
+
+\[This section loads the packages and the cleaned dataset created in Assignment 1. The tidyverse package provides the tools needed for data wrangling, summarizing, and statistical analysis.\]
+
+```{r}
+#| label: "appendix-setup"
+#| echo: true
+#| message: false
+#| warning: false
+
+library(tidyverse)
+load("w144_wrangled.RData") # Load cleaned dataset from Assignment 1
+```
+
+## 2. RQ 1: Chi-Square Test
+
+\[`chisq.test()` is the correct test because both variables — **party_simple** and **uses_tiktok** — are **categorical**. According to Slide 23, when we examine **association between two categorical variables**, the chi-square test is the correct choice.\]
+
+```{r}
+#| label: "appendix-rq1-chisq"
+#| echo: true
+
+# Create a contingency table (party_simple x uses_tiktok)
+tiktok_party_table <- table(w144_wrangled$party_simple,
+                            w144_wrangled$uses_tiktok)
+
+# Run the Chi-Square Test of Independence
+chisq.test(tiktok_party_table)
+
+```
+
+## 3. RQ 2: Independent Samples t-test
+
+\[The t-test is appropriate because we are comparing the mean of a **numeric variable** (platform_count) across **two groups**defined by a **binary categorical variable** (device_type_w144: PC vs Smartphone). This is exactly the scenario described in Slide 23.\]
+
+```{r}
+#| label: "appendix-rq2-ttest"
+#| echo: true
+
+# Filter the data to include only PC (1) and Smartphone (2) users
+device_data <- w144_wrangled %>%
+  filter(device_type_w144 %in% c(1, 2))
+
+# Independent samples t-test
+t.test(platform_count ~ device_type_w144, data = device_data)
+
+```
+
+## 4. RQ 3: ANOVA & TukeyHSD
+
+\[ANOVA (`aov()`) is the correct test because we are comparing the mean of a **numeric variable** (platform_count) across **three groups** (Democrat, Republican, Independent). This extends beyond the 2-group t-test from RQ2.\
+TukeyHSD is used to determine **which** party groups differ from each other once ANOVA tells us a difference exists.\]
+
+```{r}
+#| label: "appendix-rq3-anova"
+#| echo: true
+#| results: "hide"
+
+# Run the ANOVA
+anova_model <- aov(platform_count ~ party_simple, data = w144_wrangled)
+
+# Summary of model
+summary(anova_model)
+
+```
+
+```{r}
+#| label: "appendix-rq3-tukey"
+#| echo: true
+
+# Tukey Post-Hoc Test
+TukeyHSD(anova_model)
+
+```
